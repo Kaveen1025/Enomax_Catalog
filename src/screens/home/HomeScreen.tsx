@@ -344,7 +344,7 @@ const HomeScreen = () => {
     <SafeAreaView style={homeStyles.container}>
       <HeaderBar
         isMenu={true}
-        page="EVEREST HARDWARE CO. (PVT) LTD."
+        page="ENOMAX"
         isHome={true}
         onSync={handleSyncPress}
         onPress={() => navigation.dispatch(DrawerActions.openDrawer())}

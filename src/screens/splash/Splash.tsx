@@ -41,9 +41,9 @@ const Splash = () => {
           source={require('../../assets/images/Ehpl.png')}
           style={splashStyles.image}
         />
-        <Text style={splashStyles.hrmsTxt}>
+        {/* <Text style={splashStyles.hrmsTxt}>
           EVEREST HARDWARE CO. (PVT) LTD.
-        </Text>
+        </Text> */}
       </View>
       <View style={splashStyles.poweredByView}>
         <Text style={splashStyles.poweredBy}>Powered By</Text>

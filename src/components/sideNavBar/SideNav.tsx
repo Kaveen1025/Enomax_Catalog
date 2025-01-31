@@ -26,7 +26,7 @@ const CustomDraverContent = () => {
     setSpinnerMessage('Loading....');
     setShowSpinner(false);
     navigation.dispatch(DrawerActions.closeDrawer());
-    // navigation.navigate('Login');
+    navigation.navigate('Login' as never);
   };
 
   return (
@@ -40,9 +40,7 @@ const CustomDraverContent = () => {
                 source={require('../../assets/images/Ehpl.png')}
               />
               <View style={drawerStyles.proDetails}>
-                <Title style={drawerStyles.title}>
-                  EVEREST HARDWARE CO. (PVT) LTD.
-                </Title>
+                <Title style={drawerStyles.title}>ENOMAX</Title>
               </View>
             </View>
             <Spinner visible={showSpinner} message={spinnerMessage} />
