@@ -1,6 +1,13 @@
 import {Root_URL, Root_URL2} from '../constant/APIURL';
 import http from './httpService';
 
+
+export function loginFunction(data: any) {
+  const endPoint = `${Root_URL2}login.php`;
+  // console.log(endPoint);
+  return http.post(endPoint, data);
+}
+
 export function getProductList(data: any) {
   if (data) {
     const endPoint = `${Root_URL}getproductsbycategory.php`;

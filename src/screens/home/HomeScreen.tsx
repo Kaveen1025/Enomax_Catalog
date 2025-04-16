@@ -28,6 +28,7 @@ import catalogDetailsStyles from '../catalogDetails/Styles';
 import MainStyles from '../../constant/MainStyles';
 import FastImage from 'react-native-fast-image';
 import {DrawerActions, useNavigation} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -50,17 +51,7 @@ const HomeScreen = () => {
   const [filteredImages, setFilteredImages] = useState([]);
 
   useEffect(() => {
-    if (searchQuery) {
-      const filtered = catalogImages.filter(item =>
-        item.category.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-      setFilteredImages(filtered);
-    } else {
-      setFilteredImages(catalogImages);
-    }
-  }, [searchQuery, catalogImages]);
-
-  useEffect(() => {
+    loadCachedImages();
     getCatalogImages();
 
     const backAction = () => {
@@ -76,39 +67,93 @@ const HomeScreen = () => {
     return () => backHandler.remove();
   }, []);
 
-  const handleSyncPress = async () => {
-    dispatch(startLoading());
-    await getCatalogImages();
-    dispatch(endLoading());
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (state.isConnected) {
+        console.log('Internet restored! Fetching images...');
+        getCatalogImages();
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = catalogImages.filter(item =>
+        item.category.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+      setFilteredImages(filtered);
+    } else {
+      setFilteredImages(catalogImages);
+    }
+  }, [searchQuery, catalogImages]);
+
+  // Load images from cache before fetching from API
+  const loadCachedImages = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem('catalogImages');
+      if (cachedData) {
+        dispatch(saveCatalogImages(JSON.parse(cachedData)));
+      }
+    } catch (error) {
+      console.log('Error loading cached images:', error);
+    }
   };
+
+  // const getCatalogImages = async () => {
+  //   dispatch(startLoading());
+  //   setIsLoadingImages(true);
+  //   const networkState = await NetInfo.fetch();
+  //   try {
+  //     if (networkState.isConnected) {
+  //       getAllCatalogImages()
+  //         .then(res => {
+  //           console.log('Catalog Images Data:', res.data);
+  //           dispatch(saveCatalogImages(res.data));
+  //           setIsLoadingImages(false);
+  //         })
+  //         .catch(err => {
+  //           console.log(err);
+  //           setIsLoadingImages(false);
+  //         });
+  //       dispatch(endLoading());
+  //     } else {
+  //       dispatch(endLoading());
+  //       setIsLoadingImages(false);
+  //       Alert.alert('No internet connection, and no cached data available.');
+  //     }
+  //   } catch (error) {
+  //     dispatch(endLoading());
+  //     setIsLoadingImages(false);
+  //     Alert.alert('Something went wrong... Try again later');
+  //   }
+  // };
 
   const getCatalogImages = async () => {
     dispatch(startLoading());
     setIsLoadingImages(true);
     const networkState = await NetInfo.fetch();
+
     try {
       if (networkState.isConnected) {
-        getAllCatalogImages()
-          .then(res => {
-            console.log('Catalog Images Data:', res.data);
-            dispatch(saveCatalogImages(res.data));
-            setIsLoadingImages(false);
-          })
-          .catch(err => {
-            console.log(err);
-            setIsLoadingImages(false);
-          });
-        dispatch(endLoading());
-      } else {
-        dispatch(endLoading());
-        setIsLoadingImages(false);
-        Alert.alert('No internet connection, and no cached data available.');
+        const res = await getAllCatalogImages();
+        dispatch(saveCatalogImages(res.data));
+        await AsyncStorage.setItem('catalogImages', JSON.stringify(res.data)); // Cache images
       }
     } catch (error) {
+      console.log('Error fetching images:', error);
+    } finally {
       dispatch(endLoading());
       setIsLoadingImages(false);
-      Alert.alert('Something went wrong... Try again later');
     }
+  };
+
+  const handleSyncPress = async () => {
+    dispatch(startLoading());
+    dispatch(saveCatalogImages([])); // Clear old images before fetching new ones
+    await getCatalogImages();
+    dispatch(endLoading());
   };
 
   const topRef = useRef();
@@ -142,23 +187,58 @@ const HomeScreen = () => {
     });
   };
 
+  // const fetchCatalogDetails = async catalog_id => {
+  //   dispatch(startLoading());
+  //   const networkState = await NetInfo.fetch();
+  //   if (networkState.isConnected) {
+  //     try {
+  //       const data = new FormData();
+  //       data.append('catalogcategoryid', catalog_id);
+  //       const res = await getCatalogDetails(data);
+  //       dispatch(saveCatalogDetails(res.data));
+  //     } catch (err) {
+  //       console.error('Error fetching catalog details:', err);
+  //     } finally {
+  //       dispatch(endLoading());
+  //     }
+  //   } else {
+  //     dispatch(endLoading());
+  //     Alert.alert('No internet connection, and no cached data available.');
+  //   }
+  // };
+
   const fetchCatalogDetails = async catalog_id => {
     dispatch(startLoading());
     const networkState = await NetInfo.fetch();
-    if (networkState.isConnected) {
-      try {
+
+    try {
+      if (networkState.isConnected) {
+        // Fetch from API
         const data = new FormData();
         data.append('catalogcategoryid', catalog_id);
         const res = await getCatalogDetails(data);
+
+        // Save details to Redux store and cache them
         dispatch(saveCatalogDetails(res.data));
-      } catch (err) {
-        console.error('Error fetching catalog details:', err);
-      } finally {
-        dispatch(endLoading());
+        await AsyncStorage.setItem(
+          `catalogDetails_${catalog_id}`,
+          JSON.stringify(res.data),
+        );
+      } else {
+        // Load cached details if available
+        const cachedData = await AsyncStorage.getItem(
+          `catalogDetails_${catalog_id}`,
+        );
+        if (cachedData) {
+          dispatch(saveCatalogDetails(JSON.parse(cachedData)));
+        } else {
+          Alert.alert('No internet connection and no cached data available.');
+        }
       }
-    } else {
+    } catch (err) {
+      console.error('Error fetching catalog details:', err);
+    } finally {
       dispatch(endLoading());
-      Alert.alert('No internet connection, and no cached data available.');
     }
   };
 
@@ -263,7 +343,7 @@ const HomeScreen = () => {
                         marginLeft: 5,
                         flexShrink: 1,
                       }}>
-                      {item.qty}
+                      {item?.availableQty ? item?.availableQty : 'N/A'}
                     </Text>
                   </View>
                 </View>
@@ -286,7 +366,11 @@ const HomeScreen = () => {
       return (
         <View style={[homeStyles.imageContainer, {width, height}]}>
           <FastImage
-            source={{uri: `https://aws.erav.lk/everast/${item.path}`}}
+            source={{
+              uri: `https://aws.erav.lk/inomax/${item.path}`,
+              priority: FastImage.priority.high,
+              cache: FastImage.cacheControl.immutable, // Ensures images are stored permanently
+            }}
             style={[
               homeStyles.image2,
               isPortrait ? {marginTop: '-15%'} : {marginTop: 0},
@@ -322,7 +406,11 @@ const HomeScreen = () => {
             }
           }}>
           <FastImage
-            source={{uri: `https://aws.erav.lk/everast/${item.path}`}}
+            source={{
+              uri: `https://aws.erav.lk/inomax/${item.path}`,
+              priority: FastImage.priority.high,
+              cache: FastImage.cacheControl.immutable, // Ensures images are stored permanently
+            }}
             style={{
               width: IMAGE_SIZE,
               height: IMAGE_SIZE,
@@ -344,7 +432,7 @@ const HomeScreen = () => {
     <SafeAreaView style={homeStyles.container}>
       <HeaderBar
         isMenu={true}
-        page="ENOMAX"
+        page="Enomax"
         isHome={true}
         onSync={handleSyncPress}
         onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
@@ -376,14 +464,35 @@ const HomeScreen = () => {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          // onMomentumScrollEnd={ev => {
+          //   scrollToActiveIndex(
+          //     Math.floor(ev.nativeEvent.contentOffset.x / width),
+          //   );
+          // }}
           onMomentumScrollEnd={ev => {
-            scrollToActiveIndex(
-              Math.floor(ev.nativeEvent.contentOffset.x / width),
-            );
+            const newIndex = Math.floor(ev.nativeEvent.contentOffset.x / width);
+
+            if (newIndex !== activeIndex) {
+              setActiveIndex(newIndex);
+
+              // Ensure this executes with the correct index
+              requestAnimationFrame(() => {
+                const centerOffset =
+                  newIndex * (IMAGE_SIZE + SPACING + SPACING) -
+                  width / 2 +
+                  IMAGE_SIZE / 2;
+                const validScrollPosition = Math.min(Math.max(centerOffset, 0));
+
+                thumbRef?.current?.scrollToOffset({
+                  offset: validScrollPosition,
+                  animated: true,
+                });
+              });
+            }
           }}
-          initialNumToRender={100}
-          maxToRenderPerBatch={100}
-          windowSize={100}
+          initialNumToRender={600}
+          maxToRenderPerBatch={600}
+          windowSize={700}
           removeClippedSubviews={true}
           getItemLayout={(data, index) => ({
             length: width,
@@ -401,9 +510,9 @@ const HomeScreen = () => {
           showsHorizontalScrollIndicator={false}
           style={{position: 'absolute', bottom: 10}}
           contentContainerStyle={{paddingHorizontal: SPACING}}
-          initialNumToRender={100}
-          maxToRenderPerBatch={100}
-          windowSize={100}
+          initialNumToRender={600}
+          maxToRenderPerBatch={600}
+          windowSize={700}
           removeClippedSubviews={true}
           getItemLayout={(data, index) => ({
             length: IMAGE_SIZE + SPACING,
