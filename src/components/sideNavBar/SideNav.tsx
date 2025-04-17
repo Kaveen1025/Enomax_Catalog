@@ -1,6 +1,6 @@
 import {DrawerContentScrollView, DrawerItem} from '@react-navigation/drawer';
 import {useNavigation} from '@react-navigation/native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {View, Text, TouchableOpacity, Image, ScrollView} from 'react-native';
 import {Avatar, Drawer, Title} from 'react-native-paper';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -15,16 +15,42 @@ import {
 import Spinner from '../spinner/Spinner';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {DrawerActions} from '@react-navigation/native';
+import {useDispatch} from 'react-redux';
+import {endLoading, startLoading} from '../../redux/action/SpinnerAction';
 
 const CustomDraverContent = () => {
   const navigation = useNavigation();
   const [showSpinner, setShowSpinner] = useState(false);
   const [spinnerMessage, setSpinnerMessage] = useState('');
 
+  const dispatch = useDispatch();
+
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserName = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem('name');
+        if (storedUser) {
+          setUserName(storedUser);
+        }
+      } catch (error) {
+        console.error('Error fetching user name:', error);
+      }
+    };
+    fetchUserName();
+  }, [userName]);
+
   const logout = async () => {
-    setShowSpinner(true);
-    setSpinnerMessage('Loading....');
-    setShowSpinner(false);
+    dispatch(startLoading());
+    await AsyncStorage.removeItem('selectedArea');
+    await AsyncStorage.removeItem('selectedRef');
+    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('userType');
+    await AsyncStorage.removeItem('empid');
+    await AsyncStorage.removeItem('name');
+    await AsyncStorage.removeItem('areaId');
+    dispatch(endLoading());
     navigation.dispatch(DrawerActions.closeDrawer());
     navigation.navigate('Login' as never);
   };
@@ -40,7 +66,9 @@ const CustomDraverContent = () => {
                 source={require('../../assets/images/Ehpl.png')}
               />
               <View style={drawerStyles.proDetails}>
-                <Title style={drawerStyles.title}>ENOMAX</Title>
+                <Title style={drawerStyles.title}>
+                  {userName ? userName : 'ENOMAX'}
+                </Title>
               </View>
             </View>
             <Spinner visible={showSpinner} message={spinnerMessage} />

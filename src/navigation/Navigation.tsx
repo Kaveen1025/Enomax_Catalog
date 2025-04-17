@@ -31,6 +31,12 @@ const Navigation = () => {
           options={{headerShown: false}}
         /> */}
 
+<Stack.Screen
+          name="Login"
+          component={Login}
+          options={{headerShown: false}}
+        />
+
         <Stack.Screen
           name="DrowerNavigation"
           component={DrawerNavigation}

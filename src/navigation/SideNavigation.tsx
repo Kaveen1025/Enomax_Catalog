@@ -10,14 +10,9 @@ const Drawer = createDrawerNavigator();
 const DrawerNavigation = () => {
   return (
     <Drawer.Navigator
-      initialRouteName="Login"
+      initialRouteName="HomeScreen"
       drawerContent={props => <CustomDraverContent {...props} />}>
-      <Drawer.Screen
-        key="login"
-        name="Login"
-        component={Login}
-        options={{headerShown: false, swipeEnabled: false, unmountOnBlur: true}}
-      />
+      
 
       <Drawer.Screen
         key="homeScreen"
